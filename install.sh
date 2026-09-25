@@ -6,6 +6,8 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+export PATH="/usr/local/go/bin:/usr/local/bin:${HOME:-/root}/go/bin:${PATH:-/usr/bin:/bin}"
+
 BIN_NAME="linux-agent"
 INSTALL_BIN="/usr/local/bin/${BIN_NAME}"
 CONFIG_DIR="/etc/${BIN_NAME}"
@@ -77,12 +79,25 @@ fi
 if [ "${INSTALLED}" = "false" ]; then
   DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/linux-agent-linux-${GOARCH}"
   echo "⬇️ Downloading prebuilt binary (${GOARCH}) from GitHub..."
-  if curl -fsSL -o "${INSTALL_BIN}" "${DOWNLOAD_URL}" 2>/dev/null; then
+  
+  TMP_DL="${INSTALL_BIN}.tmp.$$"
+  if curl -fSL --retry 3 --connect-timeout 10 -o "${TMP_DL}" "${DOWNLOAD_URL}" 2>/dev/null && [ -s "${TMP_DL}" ]; then
+    mv -f "${TMP_DL}" "${INSTALL_BIN}"
     echo "✅ Download completed."
     INSTALLED=true
   else
-    echo "ℹ️ No prebuilt binary found on GitHub releases for ${GOARCH}."
+    echo "ℹ️ Direct download failed. Querying GitHub API for latest asset URL..."
+    API_URL="https://api.github.com/repos/${REPO}/releases/latest"
+    ASSET_URL="$(curl -fsSL "${API_URL}" 2>/dev/null | grep -i "browser_download_url.*linux-${GOARCH}" | head -n 1 | cut -d '"' -f 4 || true)"
+    if [ -n "${ASSET_URL}" ]; then
+      if curl -fSL --retry 3 --connect-timeout 10 -o "${TMP_DL}" "${ASSET_URL}" && [ -s "${TMP_DL}" ]; then
+        mv -f "${TMP_DL}" "${INSTALL_BIN}"
+        echo "✅ Download completed via API asset URL."
+        INSTALLED=true
+      fi
+    fi
   fi
+  rm -f "${TMP_DL}" 2>/dev/null || true
 fi
 
 # Fallback: Compile from source if Go is installed
