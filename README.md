@@ -49,21 +49,58 @@ Ported directly from the official [OpenCode](https://github.com/opencode-ai/open
 
 ---
 
-## Getting Started
+## Quick Installation via `curl`
 
-### Building from Source
-
-Requirements: **Go 1.22+**
+Install and activate `linux-agent` daemon as a standard Linux system service in one command:
 
 ```bash
-git clone https://github.com/kelvinzer0/linux-agent.git
-cd linux-agent
-make build
+curl -fsSL https://raw.githubusercontent.com/kelvinzer0/linux-agent/main/install.sh | sudo bash
 ```
 
-Binary is output to `bin/linux-agent`.
+Or specify a permanent bridge room at install time:
+```bash
+curl -fsSL https://raw.githubusercontent.com/kelvinzer0/linux-agent/main/install.sh | sudo bash -s -- --room my-linux-box
+```
+
+The installer will:
+1. Detect architecture (`amd64`, `arm64`, `arm`) and install `/usr/local/bin/linux-agent`.
+2. Generate configuration at `/etc/linux-agent/linux-agent.env`.
+3. Register and start standard Linux services via `systemd` (or `init.d` fallback).
+4. Configure automatic daily background update checks.
 
 ---
+
+## Service Management
+
+Manage the daemon using standard Linux service commands:
+
+```bash
+systemctl start linux-agent
+systemctl stop linux-agent
+systemctl restart linux-agent
+systemctl status linux-agent
+```
+
+On systems without systemd (SysVinit, OpenWrt, Alpine):
+```bash
+service linux-agent start
+service linux-agent stop
+service linux-agent restart
+service linux-agent status
+```
+
+### Automatic Updates
+
+`linux-agent` has native self-updating built-in:
+- **Automatic**: Daily checks via systemd timer (`linux-agent-update.timer`) and background daemon loop (`AUTO_UPDATE=true` in `/etc/linux-agent/linux-agent.env`).
+- **Manual**: Run anytime to upgrade to the latest GitHub release:
+  ```bash
+  linux-agent -update
+  ```
+
+---
+
+## Building from Source (Manual)
 
 ## Usage
 

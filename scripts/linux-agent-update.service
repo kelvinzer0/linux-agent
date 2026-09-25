@@ -1,0 +1,7 @@
+[Unit]
+Description=Auto-update check for linux-agent
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/linux-agent -update

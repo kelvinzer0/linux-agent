@@ -1,0 +1,16 @@
+[Unit]
+Description=linux-agent - MCP Linux Daemon (Code Interpreter & OpenCode Tools)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=-/etc/linux-agent/linux-agent.env
+ExecStart=/usr/local/bin/linux-agent
+Restart=always
+RestartSec=5s
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
