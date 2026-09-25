@@ -177,13 +177,7 @@ case "$1" in
     $0 start
     ;;
   status)
-    start-stop-daemon --status --pidfile "$PIDFILE" 2>/dev/null
-    case "$?" in
-      0) echo "linux-agent is running." ;;
-      1) echo "linux-agent is not running and the pid file exists." ;;
-      3) echo "linux-agent is not running." ;;
-      4) echo "Unable to determine linux-agent status." ;;
-    esac
+    "$DAEMON" -status
     ;;
   update)
     "$DAEMON" -update
@@ -273,7 +267,14 @@ echo "  systemctl start linux-agent"
 echo "  systemctl stop linux-agent"
 echo "  systemctl restart linux-agent"
 echo "  systemctl status linux-agent"
+echo ""
+echo "Check MCP URL anytime:"
+echo "  linux-agent status           # View live MCP URL & connection status"
 echo "  linux-agent -update          # Manual self-update"
 echo ""
 echo "Config file: ${CONFIG_FILE}"
 echo "=================================================="
+
+# Check and print immediate status
+sleep 1
+"${INSTALL_BIN}" status 2>/dev/null || true

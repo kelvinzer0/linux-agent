@@ -20,11 +20,17 @@ const (
 )
 
 func main() {
+	// Support "linux-agent status" subcommand without flags
+	if len(os.Args) > 1 && os.Args[1] == "status" {
+		printStatusAndExit()
+	}
+
 	var (
 		bridgeURL  = flag.String("bridge", getEnv("MCP_BRIDGE_URL", "https://public-mcp-bridge.warunglakku.com"), "MCP Bridge URL")
 		room       = flag.String("room", getEnv("MCP_ROOM", ""), "Room ID (if empty, generates a new room via /new)")
 		useStdio   = flag.Bool("stdio", false, "Run in stdio mode (direct JSON-RPC over stdin/stdout)")
 		showVer    = flag.Bool("version", false, "Show version and exit")
+		showStatus = flag.Bool("status", false, "Check daemon status and print current MCP URL")
 		doUpdate   = flag.Bool("update", false, "Check and perform self-update from GitHub Releases")
 		autoUpdate = flag.Bool("auto-update", getEnvBool("AUTO_UPDATE", true), "Enable background periodic auto-update checks")
 	)
@@ -33,6 +39,10 @@ func main() {
 	if *showVer {
 		fmt.Printf("linux-agent v%s\n", Version)
 		os.Exit(0)
+	}
+
+	if *showStatus {
+		printStatusAndExit()
 	}
 
 	if *doUpdate {
@@ -87,7 +97,7 @@ func main() {
 		Room:      *room,
 	}
 
-	client := bridge.NewClient(cfg, registry)
+	client := bridge.NewClient(cfg, registry, Version)
 
 	go func() {
 		<-ctx.Done()
@@ -98,6 +108,40 @@ func main() {
 	if err := client.Run(ctx); err != nil && err != context.Canceled {
 		log.Fatalf("[linux-agent] Fatal error: %v", err)
 	}
+}
+
+func printStatusAndExit() {
+	st, running, err := bridge.ReadDaemonStatus()
+	if err != nil {
+		fmt.Printf("⚠️ Error checking status: %v\n", err)
+		os.Exit(1)
+	}
+
+	if !running || st == nil {
+		fmt.Println("==================================================")
+		fmt.Println("🔴 linux-agent is STOPPED / NOT RUNNING")
+		fmt.Println("==================================================")
+		fmt.Println("Start it with:")
+		fmt.Println("  sudo systemctl start linux-agent")
+		fmt.Println("  or: linux-agent")
+		fmt.Println("==================================================")
+		os.Exit(3)
+	}
+
+	fmt.Println("==================================================")
+	fmt.Printf("🟢 linux-agent is RUNNING (PID %d)\n", st.PID)
+	fmt.Println("==================================================")
+	fmt.Printf("🔗 MCP URL:       %s\n", st.McpURL)
+	fmt.Printf("🔑 Room ID:       %s\n", st.Room)
+	fmt.Printf("🌐 Bridge URL:    %s\n", st.BridgeURL)
+	fmt.Printf("🔌 WebSocket:     %s\n", st.WebsocketURL)
+	fmt.Printf("🛠️  Active Tools:  %d tools registered\n", st.ToolsCount)
+	fmt.Printf("📦 Version:       v%s\n", st.Version)
+	fmt.Println("==================================================")
+	fmt.Println("💡 To connect MCP Clients (Claude, Cursor, Antigravity):")
+	fmt.Printf("   URL: %s\n", st.McpURL)
+	fmt.Println("==================================================")
+	os.Exit(0)
 }
 
 func getEnv(key, fallback string) string {

@@ -36,14 +36,16 @@ type Client struct {
 	ws       *websocket.Conn
 	wsMu     sync.Mutex
 	room     string
+	version  string
 	stopChan chan struct{}
 }
 
-func NewClient(cfg Config, registry *tools.Registry) *Client {
+func NewClient(cfg Config, registry *tools.Registry, version string) *Client {
 	return &Client{
 		cfg:      cfg,
 		registry: registry,
 		room:     cfg.Room,
+		version:  version,
 		stopChan: make(chan struct{}),
 	}
 }
@@ -87,6 +89,7 @@ func (c *Client) Run(ctx context.Context) error {
 
 func (c *Client) Stop() {
 	close(c.stopChan)
+	c.CleanupStatus()
 	c.wsMu.Lock()
 	if c.ws != nil {
 		_ = c.ws.Close()
@@ -143,6 +146,7 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 		return fmt.Errorf("failed registering tools: %w", err)
 	}
 	log.Printf("[MCP-Bridge] ✅ Tools registered to room %s", c.room)
+	c.SaveStatus(c.version)
 
 	// Keepalive ping ticker (every 25 seconds)
 	ticker := time.NewTicker(25 * time.Second)
