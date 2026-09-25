@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	Version = "1.0.0"
+	Version = "1.0.2"
 )
 
 func main() {
@@ -74,8 +74,8 @@ func main() {
 	// Periodic auto-update in background
 	if *autoUpdate {
 		go func() {
-			// Check once on startup after 10 seconds
-			time.Sleep(10 * time.Second)
+			// Check after 1 hour, then every 24 hours
+			time.Sleep(1 * time.Hour)
 			_ = CheckAndUpdate(false)
 
 			ticker := time.NewTicker(24 * time.Hour)

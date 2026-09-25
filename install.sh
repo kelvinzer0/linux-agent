@@ -16,7 +16,7 @@ SYSTEMD_UPDATE_TIMER="/etc/systemd/system/${BIN_NAME}-update.timer"
 INITD_SCRIPT="/etc/init.d/${BIN_NAME}"
 REPO="kelvinzer0/linux-agent"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
 
 # Parse CLI flags (e.g. ./install.sh --room my-room --bridge https://...)
 CUSTOM_ROOM=""

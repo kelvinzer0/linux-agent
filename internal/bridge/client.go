@@ -101,6 +101,13 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 	wsURL := ""
 
 	if c.room == "" {
+		c.room = GetPersistentRoom()
+		if c.room != "" {
+			log.Printf("[MCP-Bridge] Reusing persistent room ID: %s", c.room)
+		}
+	}
+
+	if c.room == "" {
 		log.Printf("[MCP-Bridge] Allocating new room from %s/new ...", c.cfg.BridgeURL)
 		newResp, err := c.allocateRoom()
 		if err != nil {
@@ -108,7 +115,8 @@ func (c *Client) connectAndServe(ctx context.Context) error {
 		}
 		c.room = newResp.Room
 		wsURL = newResp.ExtensionURL
-		log.Printf("[MCP-Bridge] New room allocated: %s", c.room)
+		SavePersistentRoom(c.room)
+		log.Printf("[MCP-Bridge] New room allocated & saved permanently: %s", c.room)
 		log.Printf("[MCP-Bridge] MCP URL for clients: %s", c.McpURL())
 	} else {
 		baseURL := strings.TrimRight(c.cfg.BridgeURL, "/")

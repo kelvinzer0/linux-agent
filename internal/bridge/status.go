@@ -2,9 +2,11 @@ package bridge
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -97,19 +99,83 @@ func ReadDaemonStatus() (*DaemonStatus, bool, error) {
 	// Check if PID is still alive
 	running := false
 	if status.PID > 0 {
-		process, err := os.FindProcess(status.PID)
-		if err == nil {
-			// On Unix, signal 0 checks for process existence without sending a signal
-			if err := process.Signal(syscall.Signal(0)); err == nil {
-				running = true
+		// On Linux, checking /proc/<pid> is reliable across different users (root vs non-root)
+		if _, err := os.Stat(fmt.Sprintf("/proc/%d", status.PID)); err == nil {
+			running = true
+		} else {
+			process, err := os.FindProcess(status.PID)
+			if err == nil {
+				err := process.Signal(syscall.Signal(0))
+				if err == nil || errors.Is(err, syscall.EPERM) {
+					running = true
+				}
 			}
 		}
 	}
 
-	if !running {
+	if !running && os.Geteuid() == 0 {
 		// Clean stale status
 		_ = os.Remove(foundPath)
 	}
 
 	return &status, running, nil
+}
+
+// GetPersistentRoom retrieves saved room ID from disk so it persists across service restarts.
+func GetPersistentRoom() string {
+	candidates := []string{
+		"/etc/linux-agent/room",
+		"/var/lib/linux-agent/room",
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, ".linux-agent", "room"))
+	}
+
+	for _, p := range candidates {
+		data, err := os.ReadFile(p)
+		if err == nil {
+			room := strings.TrimSpace(string(data))
+			if room != "" {
+				return room
+			}
+		}
+	}
+	return ""
+}
+
+// SavePersistentRoom stores room ID permanently on disk.
+func SavePersistentRoom(room string) {
+	if room == "" {
+		return
+	}
+
+	targets := []string{}
+	if os.Geteuid() == 0 {
+		targets = append(targets, "/etc/linux-agent/room")
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		targets = append(targets, filepath.Join(home, ".linux-agent", "room"))
+	}
+
+	for _, p := range targets {
+		_ = os.MkdirAll(filepath.Dir(p), 0755)
+		_ = os.WriteFile(p, []byte(room+"\n"), 0644)
+	}
+
+	// Also update /etc/linux-agent/linux-agent.env if present
+	envFile := "/etc/linux-agent/linux-agent.env"
+	if data, err := os.ReadFile(envFile); err == nil {
+		lines := strings.Split(string(data), "\n")
+		updated := false
+		for i, line := range lines {
+			if strings.HasPrefix(line, "MCP_ROOM=") {
+				lines[i] = "MCP_ROOM=" + room
+				updated = true
+				break
+			}
+		}
+		if updated {
+			_ = os.WriteFile(envFile, []byte(strings.Join(lines, "\n")), 0600)
+		}
+	}
 }
